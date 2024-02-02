@@ -1,0 +1,17 @@
+.gradle
+
+.classpath
+.project
+.settings
+bin
+build
+target
+
+# idea
+*.iml
+.idea
+
+# mac
+*.DS_Store
+
+*.log
