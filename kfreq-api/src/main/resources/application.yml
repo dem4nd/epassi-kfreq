@@ -1,0 +1,14 @@
+spring:
+  jackson:
+    serialization:
+      INDENT_OUTPUT: true
+
+kfreq:
+  default-encoding: UTF-8
+  min-length: 3
+  max-length: 100
+  stop-words: [is, be, are, was, were, been, have, has, had, can, could,
+               a, the, by, "on", to, for, at, in, from, out, s t, ll]
+
+s3:
+  credentials: /opt/creds
