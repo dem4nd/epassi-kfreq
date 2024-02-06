@@ -6,7 +6,7 @@ import org.springframework.context.annotation.ComponentScan;
 
 
 @SpringBootApplication
-@ComponentScan(basePackages = "epassi.kfreq.http")
+@ComponentScan(basePackages = "epassi.kfreq.controller")
 public class KFreqApp {
 
   public static void main(String[] args) {

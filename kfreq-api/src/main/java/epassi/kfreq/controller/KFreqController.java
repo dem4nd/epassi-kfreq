@@ -1,8 +1,9 @@
-package epassi.kfreq.http;
+package epassi.kfreq.controller;
 
 import epassi.kfreq.model.FrequencyRecord;
 import epassi.kfreq.model.Status;
 import epassi.kfreq.model.TopBodyRequest;
+import epassi.kfreq.service.KFreqService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -30,7 +31,7 @@ public class KFreqController {
   @Autowired
   private Environment env;
 
-  private final KFreqEngine engine = new KFreqEngine();
+  private final KFreqService engine = new KFreqService();
 
   @GetMapping(value = "/status", produces = "application/json")
   @ApiResponses({
@@ -61,7 +62,7 @@ public class KFreqController {
     String encoding = Optional.ofNullable(top.encoding())
         .orElse(env.getProperty(CONF_KEY_ENCODING, DEFAULT_ENCODING));
 
-    List<FrequencyRecord> result = engine.gather("https://s3.eu-north-1.amazonaws.com/dev.01/epassi/steinbeck.txt", top.limit(), encoding);
+    List<FrequencyRecord> result = engine.gather(top.resourceUrl(), top.limit(), encoding);
 
     return ResponseEntity.ok(result);
   }
