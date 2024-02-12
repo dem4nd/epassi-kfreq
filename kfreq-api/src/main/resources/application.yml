@@ -3,19 +3,36 @@ spring:
     serialization:
       INDENT_OUTPUT: true
 
+server:
+  error:
+    include-message: always
+    include-binding-errors: always
+
 springdoc:
   api-docs:
     path: /api-docs
 
 kfreq:
   default-encoding: UTF-8
-  min-length: 3
+  # Minimum word length (mandatory).
+  # To exclude insignificant short words. Recommended values 1-3.
+  min-length: 2
+  # maximum word length (mandatory)
+  # To exclude huge and consequently invalid words which may cause memory
+  # overflow (e.g. 1Gb word without any separator).
   max-length: 100
-  stop-words: [is, be, are, was, were, been, have, has, had, can, could,
-               a, the, by, "on", to, for, at, in, from, out, s t, ll]
+  stop-words: [
+    a, about, an, and, are, as, at, be, been, but, by, can, could, for,
+    from, had, has, have, he, her, him, his, i, if, in, is, it, its,
+    ll, me, mine, my, not, of, "on", or, our, out, s, she, so, t, that,
+    the, these, they, this, those, to, up, was, we, were, with, without,
+    you, your
+  ]
 
 s3:
-  credentials: /opt/creds/s3.yml
+  # properties file format
+  credentialsFile: /etc/epassi/kfreq/credentials/s3.properties
 
 api:
-  credentials: /opt/creds/api.yml
+  # properties file format
+  credentialsFile: /etc/epassi/kfreq/credentials/api.properties

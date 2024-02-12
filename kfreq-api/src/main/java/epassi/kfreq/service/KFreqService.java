@@ -1,68 +1,116 @@
 package epassi.kfreq.service;
 
+import epassi.kfreq.dao.S3IOException;
 import epassi.kfreq.dao.S3ObjectsDao;
 import epassi.kfreq.model.FrequencyRecord;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 import java.io.*;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
 
+
+@Component
 public class KFreqService {
 
-  private final S3ObjectsDao dao = new S3ObjectsDao();
+  @Autowired
+  private S3ObjectsDao dao;
 
-  public List<FrequencyRecord> gather(String url, int limit, String encoding)
-      throws MalformedURLException, UnsupportedEncodingException {
-    var ist = dao.getObjectInputStream(new URL(url));
-    return countWords(ist, limit, encoding);
+  private final AtomicInteger processedCount = new AtomicInteger(0);
+
+  private static class WordsDictionary {
+    private int limit;
+
+    private int minLength;
+
+    private int maxLength;
+
+    private Set<String> stopWords;
+
+    private Map<String, Integer> words = new HashMap<String, Integer>();
+
+//    private SortedSet<FrequencyRecord> winners = new TreeSet<FrequencyRecord>();
+
+    public static final Pattern hyphenRe = Pattern.compile("(^-.+)|(.+-$)");
+
+    public WordsDictionary(int limit, int minLength, int maxLength, Set<String> stopWords) {
+      this.limit = limit;
+      this.minLength = minLength;
+      this.maxLength = maxLength;
+      this.stopWords = stopWords;
+    }
+
+    // Returns Optional normalized word:
+    //   - in lowercase if word meets requirements
+    //   - empty if it doesn't.
+    // Requirements:
+    //   - lenght in range (minLength:maxLength)
+    //   - hyphen '-' character is not in first or last position
+    //   - the word is not in stop list specified in app config
+    Optional<String> filterWord(String word) {
+      if (word.length() >= minLength
+          && word.length() <= maxLength
+          && !hyphenRe.matcher(word).matches()) {
+        return Optional.of(word.toLowerCase()).filter(w -> !stopWords.contains(w));
+      }
+      return Optional.empty();
+    }
+
+    void addWord(String word) {
+      filterWord(word)
+          .ifPresent(w -> words.put(w, words.getOrDefault(w, 0) + 1));
+    }
+
+    // Returns list of winners
+    List<FrequencyRecord> result() {
+      return words.entrySet().stream()
+          .map(e -> new FrequencyRecord(e.getKey(), e.getValue()))
+          .sorted()
+          .limit(limit)
+          .toList();
+    }
   }
 
-  public List<FrequencyRecord> countWords(InputStream ist, int limit, String encoding)
-      throws UnsupportedEncodingException {
+  public List<FrequencyRecord> runCompetionon(String url, int limit,
+      String encoding, int minLength, int maxLength, Set<String> stopWords)
+      throws S3IOException, IOException {
 
-    Map<String, Integer> words = new HashMap<String, Integer>();
+    try (InputStream ist = dao.getObjectInputStream(url)) {
+      WordsDictionary wordsDic = new WordsDictionary(limit, minLength, maxLength, stopWords);
 
-    try {
       Reader reader = new BufferedReader(new InputStreamReader(ist, encoding));
       int r;
       StringBuilder currentWord = new StringBuilder();
+
       while ((r = reader.read()) != -1) {
         char ch = (char) r;
-        if (Character.isAlphabetic(ch)) {
-          currentWord.append(ch);
-        } else if (!currentWord.isEmpty()) {
-          String word = currentWord.toString().toLowerCase();
-          Integer count = words.get(word);
-          if (count == null) {
-            count = 1;
-          } else {
-            count = count + 1;
+        if (Character.isAlphabetic(ch) || ch == '-') {
+          if (currentWord.length() <= maxLength) { // avoid
+            currentWord.append(ch);
           }
-          words.put(word, count);
+        } else {
+          wordsDic.addWord(currentWord.toString());
           currentWord.setLength(0);
         }
       }
       if (!currentWord.isEmpty()) {
-        String word = currentWord.toString().toLowerCase();
-        Integer count = words.get(word);
-        if (count == null) {
-          count = 1;
-        } else {
-          count = count + 1;
-        }
-        words.put(word, count);
+        wordsDic.addWord(currentWord.toString());
       }
+
+      processedCount.incrementAndGet();
+      return wordsDic.result();
+    } catch (UnsupportedEncodingException x) {
+      throw new S3IOException("Illegal encoding: " + encoding);
     } catch (IOException x) {
-      //
+      throw new S3IOException(x.getMessage());
+    } catch (S3IOException x) {
+      throw x;
     }
+  }
 
-    List<FrequencyRecord> recs = words.entrySet().stream()
-        .map(e -> new FrequencyRecord(e.getKey(), e.getValue()))
-        .sorted()
-        .limit(limit)
-        .toList();
-
-    return recs;
+  public int getProcessedCount() {
+    return processedCount.get();
   }
 }

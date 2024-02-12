@@ -1,5 +1,6 @@
 package epassi.kfreq.controller;
 
+import epassi.kfreq.dao.S3IOException;
 import epassi.kfreq.model.FrequencyRecord;
 import epassi.kfreq.model.Status;
 import epassi.kfreq.model.TopBodyRequest;
@@ -11,27 +12,41 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.core.env.Environment;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
-import java.util.List;
-import java.util.Optional;
+import java.io.IOException;
+import java.util.*;
+import java.util.stream.Collectors;
 
 
+//@Configuration
+//@ConfigurationProperties(prefix = "kfreq")
 @RestController
 @RequestMapping("/api/v1")
 @Tag(name = "Epassi Coding Test", description = "REST API for finding the top K most frequent words in file")
 public class KFreqController {
 
-  private static String CONF_KEY_ENCODING = "kfreq.default-encoding";
-  private static String DEFAULT_ENCODING = "UTF-8";
+  @Autowired
+  private KFreqService engine;
 
   @Autowired
-  private Environment env;
+  private Conf conf;
 
-  private final KFreqService engine = new KFreqService();
+  private Set<String> stopWords;
+
+  @PostConstruct
+  private void init() {
+    stopWords = conf.getStopWords().stream().map(String::toLowerCase).collect(Collectors.toSet());
+  }
 
   @GetMapping(value = "/status", produces = "application/json")
   @ApiResponses({
@@ -42,7 +57,7 @@ public class KFreqController {
   @Operation(
       summary = "Get API server status and statistics")
   public ResponseEntity<Status> status() {
-    return ResponseEntity.ok(new Status(0, "Ok"));
+    return ResponseEntity.ok(new Status(0, "Ok", engine.getProcessedCount()));
   }
 
   @PostMapping(value = "/top", consumes = "application/json", produces = "application/json")
@@ -55,16 +70,21 @@ public class KFreqController {
           content = @Content(schema = @Schema()))
   })
   @Operation(
-      summary = "Retrieve a Tutorial by Id",
-      description = "Get a Tutorial object by specifying its id. The response is Tutorial object with id, title, description and published status.")
+      summary = "",
+      description = "")
   public ResponseEntity<List<FrequencyRecord>> topCount(@RequestBody TopBodyRequest top)
-      throws Exception {
-    String encoding = Optional.ofNullable(top.encoding())
-        .orElse(env.getProperty(CONF_KEY_ENCODING, DEFAULT_ENCODING));
+      throws ResponseStatusException {
 
-    List<FrequencyRecord> result = engine.gather(top.resourceUrl(), top.limit(), encoding);
+    String actualEncoding = Optional.ofNullable(top.getEncoding()).orElse(conf.getDefaultEncoding());
+    Set<String> actualStopWords = top.isUseStopWords() ? stopWords : Collections.emptySet();
 
-    return ResponseEntity.ok(result);
+    try {
+      return ResponseEntity.ok(engine.runCompetionon(top.getResourceUrl(), top.getLimit(),
+          actualEncoding, conf.getMinLength(), conf.getMaxLength(), actualStopWords));
+    } catch (S3IOException x) {
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, x.getMessage());
+    } catch (IOException x) {
+      throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, x.getMessage());
+    }
   }
-
 }
