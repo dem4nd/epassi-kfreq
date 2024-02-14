@@ -53,7 +53,7 @@ words every time the API is called with the same text file and K value.
 
 ## Build and Run
 
-Get from Github repository (https://github.com/dem4nd/epassi-kfreq):
+Get project from Github repository (https://github.com/dem4nd/epassi-kfreq):
 
 ```
 git clone https://github.com/dem4nd/epassi-kfreq.git
@@ -67,7 +67,21 @@ gradle :kfreq-api:bootRun
 
 ## Tests
 
-To be accomplished
+Run unit tests:
+
+```
+gradle :kfreq-api:test
+```
+
+Test 
+
+Documents urls
+
+* https://s3.eu-north-1.amazonaws.com/dev.01/epassi/steinbeck.txt (5.5Kb)
+* https://s3.eu-north-1.amazonaws.com/dev.01/epassi/amazon-reviews.txt (1.2Gb)
+
+
+
 
 
 ## API Documentation

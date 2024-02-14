@@ -1,7 +1,12 @@
 package epassi.kfreq.model;
 
 
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
 import io.swagger.v3.oas.annotations.media.Schema;
+import org.springframework.lang.NonNull;
+
+import java.util.Optional;
 
 @Schema(description = "Top words source request parameters")
 public class TopBodyRequest {
@@ -9,9 +14,9 @@ public class TopBodyRequest {
         example = "https://s3.eu-north-1.amazonaws.com/dev.01/epassi/steinbeck.txt")
     private String resourceUrl;
 
-    @Schema(description = "Most frequent words limit",
+    @Schema(description = "Most frequent words limit (> 0)",
         example = "8")
-    private int limit;
+    private Integer limit;
 
     @Schema(description = "Encoding of source text (optional)",
         example = "UTF-8",
@@ -21,7 +26,14 @@ public class TopBodyRequest {
     @Schema(description = "Use stop words which are supposed not to be included into counting (optional)",
         example = "true",
         defaultValue = "true")
-    private boolean useStopWords = true;
+    private Boolean useStopWords;
+
+    public TopBodyRequest(String resourceUrl, Integer limit, String encoding, Boolean useStopWords) {
+        this.resourceUrl = resourceUrl;
+        this.limit = limit;
+        this.encoding = encoding;
+        this.useStopWords = useStopWords;
+    }
 
     public String getResourceUrl() {
         return resourceUrl;
@@ -31,11 +43,11 @@ public class TopBodyRequest {
         this.resourceUrl = resourceUrl;
     }
 
-    public int getLimit() {
+    public Integer getLimit() {
         return limit;
     }
 
-    public void setLimit(int limit) {
+    public void setLimit(Integer limit) {
         this.limit = limit;
     }
 
@@ -47,11 +59,11 @@ public class TopBodyRequest {
         this.encoding = encoding;
     }
 
-    public boolean isUseStopWords() {
+    public Boolean isUseStopWords() {
         return useStopWords;
     }
 
-    public void setUseStopWords(boolean useStopWords) {
+    public void setUseStopWords(Boolean useStopWords) {
         this.useStopWords = useStopWords;
     }
 }
