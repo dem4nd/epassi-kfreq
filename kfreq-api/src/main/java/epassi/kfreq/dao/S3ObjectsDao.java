@@ -58,8 +58,6 @@ public class S3ObjectsDao {
     if (accessKey.isEmpty() || secret.isEmpty()) {
       var credFileNameOpt = Optional.ofNullable(System.getenv(S3_CREDENTIALS_ENV_PROP))
           .or(() -> Optional.ofNullable(env.getProperty(S3_CREDENTIALS_PROP)));
-//      var credFileNameOpt = Optional.ofNullable(System.getProperty(S3_CREDENTIALS_ENV_PROP))
-//          .or(() -> Optional.ofNullable(env.getProperty(S3_CREDENTIALS_PROP)));
 
       if (credFileNameOpt.isEmpty()) {
         logger.error("S3 credentials properties file is not specified in config or in environment variable");
