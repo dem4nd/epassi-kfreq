@@ -1,5 +1,6 @@
 # Epassi Coding Test
 
+
 ## Task description
 
 The goal of this challenge is to write a REST API that takes a plain text file
@@ -49,8 +50,18 @@ users can access the app.
 - Implement a caching mechanism to avoid re-calculating the top K most frequent
 words every time the API is called with the same text file and K value.
 
-## Build and run
+
+## Build and Run
 
 ```
 gradle :kfreq-api:bootRun
 ```
+
+## Tests
+
+To be accomplished
+
+
+## API Documentation
+
+Swagger injected docs at: http://localhost:8080/swagger-ui/index.html

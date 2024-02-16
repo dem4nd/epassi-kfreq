@@ -12,5 +12,4 @@ public class KFreqApp {
   public static void main(String[] args) {
     SpringApplication.run(KFreqApp.class, args);
   }
-
 }

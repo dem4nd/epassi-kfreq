@@ -3,6 +3,10 @@ spring:
     serialization:
       INDENT_OUTPUT: true
 
+springdoc:
+  api-docs:
+    path: /api-docs
+
 kfreq:
   default-encoding: UTF-8
   min-length: 3
@@ -11,4 +15,7 @@ kfreq:
                a, the, by, "on", to, for, at, in, from, out, s t, ll]
 
 s3:
-  credentials: /opt/creds
+  credentials: /opt/creds/s3.yml
+
+api:
+  credentials: /opt/creds/api.yml
