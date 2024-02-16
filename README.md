@@ -193,7 +193,7 @@ Words consisting of letters and numbers are considered correct. The hyphen `'-'`
 middle of a word. Also, conjunctions, prepositions, modal verbs, pronouns and articles are specified in
 the configuration file in `stop-words` property and will be ignored to make the result more sensible. 
 
-Stop words usage can be turned off in request json with property `"useStopWords": true`.
+Stop words usage can be turned off in request json with property `"useStopWords": false`.
 
 Examples of words:
 
@@ -205,18 +205,19 @@ Examples of words:
 * -tail _(incorrect and will be ignored because of hyphen in the biginning)_  
 * tail- _(incorrect and will be ignored because of hyphen in the end)_
 * John#Doe _(will be splitted to John and Doe)_
-* that - _(will be ignored with default "stop words" mode)_
+* that _(will be ignored in default "stop words" mode)_
 
 ### Optimization (cache results)
 
 Results caching is implemented as well. WeakHashMap has been chosen as cache storage to avoid memory overflow.
-The key of the cached result is the document url. An exact match of `limit` is optional. If in the request
-`limit` is less than or equal to the size of the cached list, a fragment of the cached list will be extracted
-without extra calculations.
+The key of the cached result is the document url. An exact match of `limit` is not necessary. The cached result
+will be retrieved even if the `limit` value is less than the size of the cached list of words with its frequencies.
+In this case  required fragment of the cached list will be extracted without redundant document downloading
+and processing.
 
 ### Computational complexity
 
-Complexity of N insertions into HashMap is **O(N)**. Sort complexity is **O(NlogN)**.
+Complexity of **N** insertions into HashMap is **O(N)**. Sort complexity is **O(NlogN)**.
 The aggregate computational complexity is calculated as a maximum of two parts and will be **O(NlogN)**,
 where **N** is number of **unique** words. 
 
