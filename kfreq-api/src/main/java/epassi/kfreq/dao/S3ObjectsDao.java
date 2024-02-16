@@ -30,8 +30,9 @@ import java.util.Properties;
 public class S3ObjectsDao {
 
   public static final String S3_CREDENTIALS_PROP = "s3.credentialsFile";
-  public static final String S3_ACCESS_KEY_PROP = "access-key";
-  public static final String S3_SECRET_PROP = "secret";
+  public static final String S3_CREDENTIALS_ENV_PROP = "S3_CREDENTIALS_FILE";
+  public static final String S3_ACCESS_KEY_PROP = "S3_ACCESS_KEY";
+  public static final String S3_SECRET_PROP = "S3_SECRET";
 
   private final Logger logger = LoggerFactory.getLogger(S3ObjectsDao.class);
 
@@ -47,33 +48,54 @@ public class S3ObjectsDao {
   private record ObjectLocationParts(String regionName, String bucket, String objectKey) { }
 
   // Fills credentials object property or leaves it empty.
-  // Empty credentials leaves empty s3Client property after actualizeClient
-  // and will raise error exception in getObjectInputStream.
+  // Empty credentials leave empty s3Client property after actualizeClient
+  // and raise error exception in getObjectInputStream.
   @PostConstruct
   public void readCredentials () {
-    var credFileName = env.getProperty(S3_CREDENTIALS_PROP);
-    if (credFileName == null) {
-      logger.error("S3 credentials properties file is not specified in config");
-    } else {
-      try {
-        var propInp = new FileInputStream(credFileName);
-        Properties prop = new Properties();
-        prop.load(propInp);
-        credentials = Optional.of(new BasicAWSCredentials(
-            prop.getProperty(S3_ACCESS_KEY_PROP),
-            prop.getProperty(S3_SECRET_PROP)));
-      } catch (FileNotFoundException x) {
-        logger.error("S3 credentials properties file is not found: " + credFileName);
-      } catch (IOException x) {
-        logger.error("Error on reading S3 credentials properties: " + credFileName);
-      } catch (IllegalArgumentException x) {
-        logger.error(x.getMessage());
+    Optional<String> accessKey = Optional.ofNullable(System.getenv(S3_ACCESS_KEY_PROP));
+    Optional<String> secret = Optional.ofNullable(System.getenv(S3_SECRET_PROP));
+
+    if (accessKey.isEmpty() || secret.isEmpty()) {
+      var credFileNameOpt = Optional.ofNullable(System.getenv(S3_CREDENTIALS_ENV_PROP))
+          .or(() -> Optional.ofNullable(env.getProperty(S3_CREDENTIALS_PROP)));
+//      var credFileNameOpt = Optional.ofNullable(System.getProperty(S3_CREDENTIALS_ENV_PROP))
+//          .or(() -> Optional.ofNullable(env.getProperty(S3_CREDENTIALS_PROP)));
+
+      if (credFileNameOpt.isEmpty()) {
+        logger.error("S3 credentials properties file is not specified in config or in environment variable");
+      } else {
+        var credFileName = credFileNameOpt.get();
+        try {
+          var propInp = new FileInputStream(credFileName);
+          Properties prop = new Properties();
+          prop.load(propInp);
+
+          accessKey = accessKey.or(() -> Optional.ofNullable(prop.getProperty(S3_ACCESS_KEY_PROP)));
+          if (accessKey.isEmpty()) {
+            logger.error("S3 access key is not defined in credentials file or in environment variable");
+          }
+          secret = secret.or(() -> Optional.ofNullable(prop.getProperty(S3_SECRET_PROP)));
+          if (secret.isEmpty()) {
+            logger.error("S3 secret is not defined in credentials file or in environment variable");
+          }
+        } catch (FileNotFoundException x) {
+          logger.error("S3 credentials properties file is not found: " + credFileName);
+        } catch (IOException x) {
+          logger.error("Error on reading S3 credentials properties: " + credFileName);
+        } catch (IllegalArgumentException x) {
+          logger.error(x.getMessage());
+        }
       }
+    }
+
+    if (accessKey.isPresent() && secret.isPresent()) {
+      credentials = Optional.of(new BasicAWSCredentials(
+          accessKey.get(), secret.get()));
     }
   }
 
   private ObjectLocationParts parseObjectUrl(String url)
-      throws ParsingS3UrlException {
+      throws S3ParsingUrlException {
 
     try {
       S3Uri s3Uri = s3Utilities.parseUri(URI.create(url));
@@ -87,16 +109,16 @@ public class S3ObjectsDao {
       } else {
         String msg = "URL is not in S3 object format: " + url;
         logger.error(msg);
-        throw new ParsingS3UrlException(msg);
+        throw new S3ParsingUrlException(msg);
       }
     } catch (IllegalArgumentException x) {
       logger.error(x.getMessage());
-      throw new ParsingS3UrlException(x.getMessage());
+      throw new S3ParsingUrlException(x.getMessage());
     }
   }
 
   private void actualizeClient(String region)
-      throws IllegalS3ClientException {
+      throws S3IllegalClientException {
 
     if (s3Client.stream().noneMatch(c -> c.getRegionName().equals(region))) {
       s3Client.ifPresent(AmazonS3::shutdown);
@@ -111,20 +133,20 @@ public class S3ObjectsDao {
       } catch (IllegalArgumentException x) {
         String msg = String.format("Can not create client for region '%s'", region);
         logger.error(msg);
-        throw new IllegalS3ClientException(msg);
+        throw new S3IllegalClientException(msg);
       }
     }
   }
 
   public InputStream getObjectInputStream(String url)
-      throws S3IOException {
+      throws S3Exception {
 
     try {
-      var objParts = parseObjectUrl(url); // can throw ParseS3URLException
-      actualizeClient(objParts.regionName); // can throw IllegalS3ClientException
+      var objParts = parseObjectUrl(url); // can throw S3ParsingUrlException
+      actualizeClient(objParts.regionName); // can throw S3IllegalClientException
       return s3Client.get().getObject(objParts.bucket, objParts.objectKey).getObjectContent();
-    } catch (S3Exception x) {
-      throw new S3IOException(x.getMessage());
+    } catch (SdkClientException x) {
+      throw new S3NotFoundException(x.getMessage());
     }
   }
 }

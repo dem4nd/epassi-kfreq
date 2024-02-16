@@ -82,7 +82,7 @@ public class KFreqService {
 
   public List<FrequencyRecord> runCompetition(String url, int limit,
       String encoding, int minLength, int maxLength, Set<String> stopWords)
-      throws S3IOException, IOException {
+      throws S3IOException, KFreqUnsupportedEncodingException {
 
     var winners = cache.get(url, limit)
         .orElseGet(() -> {
@@ -111,11 +111,9 @@ public class KFreqService {
 
             return cache.put(url, wordsDic.result());
           } catch (UnsupportedEncodingException x) {
-            throw new S3IOException("Illegal encoding: " + encoding);
+            throw new KFreqUnsupportedEncodingException("Illegal encoding: " + encoding);
           } catch (IOException x) {
             throw new S3IOException(x.getMessage());
-          } catch (S3IOException x) {
-            throw x;
           }
     });
 

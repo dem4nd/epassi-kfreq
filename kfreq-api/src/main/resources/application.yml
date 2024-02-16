@@ -33,6 +33,7 @@ s3:
   # properties file format
   credentialsFile: /etc/epassi/kfreq/credentials/s3.properties
 
+# not implemented yet
 api:
   # properties file format
   credentialsFile: /etc/epassi/kfreq/credentials/api.properties

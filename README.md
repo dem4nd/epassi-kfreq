@@ -55,34 +55,175 @@ words every time the API is called with the same text file and K value.
 
 Get project from Github repository (https://github.com/dem4nd/epassi-kfreq):
 
-```
+```bash
 git clone https://github.com/dem4nd/epassi-kfreq.git
 ```
 
-Build and run:
+Build and run with the following command. The S3 credentials are specified in the file `/etc/epassi/kfreq/credentials/s3.properties`. The file is attached to the email. 
 
-```
-gradle :kfreq-api:bootRun
+```bash
+gradlew :kfreq-api:bootRun
 ```
 
 ## Tests
 
-Run unit tests:
+### Environment
 
+The application has been built and tested in the following environment:
+
+* MacOS Ventura 13.4.1
+* Java openjdk 17.0.4.1
+* Gradle 8.6
+
+### Run unit tests
+
+```bash
+gradlew :kfreq-api:test
 ```
-gradle :kfreq-api:test
+
+### Test with real documents from AWS S3
+
+#### 1. Start server
+
+If the S3 credentials file is exactly at `/etc/epassi/kfreq/credentials/s3.properties`:
+
+```bash
+gradlew :kfreq-api:bootRun
 ```
 
-Test 
+If the S3 credentials file is located elsewhere:
 
-Documents urls
+```bash
+S3_CREDENTIALS_FILE=<Credentials file> gradlew :kfreq-api:bootRun
+```
+
+If S3 access key and secret are specified in command line:
+
+```bash
+S3_ACCESS_KEY=<S3 Key> S3_SECRET=<S3 Secret> gradlew :kfreq-api:bootRun
+```
+
+> *The credentials file is attached to the email. Valid access key and secret are provided within the email text as well.*
+
+#### 2. Send request command in another terminal window
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/top \
+    -H "Content-Type: application/json" \
+    -d '{"resourceUrl":"https://s3.eu-north-1.amazonaws.com/dev.01/epassi/steinbeck.txt","limit":6}'
+```
+
+Document size is <b>5.5&nbsp;Kb</b>. The initial request was completed within <b>1.3&nbsp;seconds</b>, whereas
+subsequent requests, benefiting from cached results, were completed in <b>3.9&nbsp;milliseconds</b>.
+
+Results looks like that:
+
+```json
+[ {
+  "word" : "steinbeck",
+  "count" : 19
+}, {
+  "word" : "book",
+  "count" : 7
+}, {
+  "word" : "men",
+  "count" : 6
+}, {
+  "word" : "california",
+  "count" : 6
+}, {
+  "word" : "film",
+  "count" : 5
+}, {
+  "word" : "george",
+  "count" : 5
+} ]
+```
+
+Request with huge document: 
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/top \
+    -H "Content-Type: application/json" \
+    -d '{"resourceUrl":"https://s3.eu-north-1.amazonaws.com/dev.01/epassi/amazon-reviews.txt","limit":6}'
+```
+
+Document size is <b>1.2&nbsp;Gb</b>. The initial request was completed within <b>~&nbsp;5&nbsp;minutes</b>, whereas
+subsequent requests, benefiting from cached results, were completed in <b>3.5&nbsp;milliseconds</b>.
+
+Possible documents urls for testing:
 
 * https://s3.eu-north-1.amazonaws.com/dev.01/epassi/steinbeck.txt (5.5Kb)
 * https://s3.eu-north-1.amazonaws.com/dev.01/epassi/amazon-reviews.txt (1.2Gb)
 
+### Request specification
 
+Request method is `POST /api/v1/top`.
 
+Full request body looks like that:
 
+```json
+{
+  "resourceUrl": "https://s3.eu-north-1.amazonaws.com/dev.01/epassi/steinbeck.txt",
+  "limit": 10,
+  "encoding": "UTF-8",
+  "useStopWords": true
+}
+```
+
+and minimal like that:
+
+```json
+{
+  "resourceUrl": "https://s3.eu-north-1.amazonaws.com/dev.01/epassi/steinbeck.txt",
+  "limit": 10
+}
+```
+
+## Algorithm details and complexity
+
+### Description
+
+For word frequency calculation, a HashMap is employed, where normalized correct words serve as keys and the
+corresponding values represent the frequency count. After populating the HashMap, it is converted into an
+ArrayList and sorted in descending order based on the frequency count. Subsequently, the top entries of the
+desired size are extracted from the sorted list.
+
+Words consisting of letters and numbers are considered correct. The hyphen `'-'` separator can be used in the
+middle of a word. Also, conjunctions, prepositions, modal verbs, pronouns and articles are specified in
+the configuration file in `stop-words` property and will be ignored to make the result more sensible. 
+
+Stop words usage can be turned off in request json with property `"useStopWords": true`.
+
+Examples of words:
+
+* Java _(correct)_
+* 2nd _(correct)_
+* son-in-law _(correct)_
+* abc476-x65 _(correct by design)_
+* 1235 _(correct)_
+* -tail _(incorrect and will be ignored because of hyphen in the biginning)_  
+* tail- _(incorrect and will be ignored because of hyphen in the end)_
+* John#Doe _(will be splitted to John and Doe)_
+* that - _(will be ignored with default "stop words" mode)_
+
+### Optimization (cache results)
+
+Results caching is implemented as well. WeakHashMap has been chosen as cache storage to avoid memory overflow.
+The key of the cached result is the document url. An exact match of `limit` is optional. If in the request
+`limit` is less than or equal to the size of the cached list, a fragment of the cached list will be extracted
+without extra calculations.
+
+### Computational complexity
+
+Complexity of N insertions into HashMap is **O(N)**. Sort complexity is **O(NlogN)**.
+The aggregate computational complexity is calculated as a maximum of two parts and will be **O(NlogN)**,
+where **N** is number of **unique** words. 
+
+### Space complexity
+
+HashMap space complexity is **O(N)**. ArrayList and sort space complexity are **O(N)** as well.
+Thus, the aggregate space complexity has linear growth rate **O(N)**, where **N** is number of **unique** words.
 
 ## API Documentation
 
